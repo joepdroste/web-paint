@@ -1,0 +1,7 @@
+.env
+.venv
+node_modules
+build
+target
+postgresqlite
+__pycache__
