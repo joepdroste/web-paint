@@ -1,6 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import { Circle, Rectangle, Line, Brush } from "./shapes";
+    import { register, login, saveDrawing, deleteImage, deleteAllImages } from './api.js';
 
     let canvas;
     let context;
@@ -12,6 +13,9 @@
     let currentLineWidth = 1
     let brushStrokes = [];
     let currentRoom = null;
+    let username = "";
+    let password = "";
+    let deleteID = null;
 
     const socket = io();
 
@@ -27,7 +31,7 @@
     };
 
     function clearCanvas() {
-        context.clearRect(0, 0, width, height);
+        context.clearRect(0, 0, 1920, 1080);
         brushStrokes = [];
     }
 
@@ -46,19 +50,6 @@
     function joinRoom() {
         socket.emit("joinRoom", currentRoom);
         console.log(`Joined room: ${currentRoom}`);
-    }
-
-    // Share the drawing
-    async function shareDrawing() {
-        const image = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-        
-        await fetch("/api/drawings", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ image }),
-        });
     }
 
     function getMousePosition(event) {
@@ -175,7 +166,7 @@
     });
 </script>
 
-<div>
+<div class="main">
     <div class="container">
         <canvas
             bind:this={canvas}
@@ -192,8 +183,16 @@
 
     <!-- Toolbar -->
     <div class="toolbar">
-        <button on:click="{shareDrawing}">Share</button>
+        <input type="text" placeholder="Username" bind:value="{username}">
+        <input type="password" placeholder="Password" bind:value="{password}">
+        <button on:click="{() => register(username, password)}">Register</button>
+        <button on:click="{() => login(username, password)}">Login</button>
+        <button on:click="{() => saveDrawing(canvas)}">Save</button>
         <button on:click="{emitClear}">Clear</button>
+        <button on:click={deleteImage(deleteID)}>Delete</button>
+        <button on:click={deleteAllImages(deleteID)}>Delete All</button>
+        <input type="number" placeholder="Drawing ID" bind:value={deleteID}>
+        <!-- <button on:click={loadDrawing}>Load</button> -->
         <select bind:value="{currentShape}">
             {#each Object.keys(shapeMap) as shape}
                 <option value="{shape}">{shape}</option>

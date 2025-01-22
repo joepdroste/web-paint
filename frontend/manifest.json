@@ -1,0 +1,29 @@
+{
+    "name": "skrobbl",
+    "short_name": "skrobbl",
+    "theme_color": "#8465ff",
+    "background_color": "rgba(255,255,255,0)",
+    "display": "fullscreen",
+    "scope": "/",
+    "start_url": "/",
+    "icons": [{
+        "src": "/icons/skrobbl.png",
+        "sizes": "512x512",
+        "type": "image/png"
+    }],
+    "screenshots": [
+        {
+         "src": "screenshots/screenshot1.png",
+          "sizes": "1920x946",
+          "type": "image/png",
+          "form_factor": "wide",
+          "label": "skrobbl"
+        },
+        {
+            "src": "screenshots/screenshot1.png",
+             "sizes": "1920x946",
+             "type": "image/png",
+             "label": "skrobbl"
+        }
+    ]
+}
