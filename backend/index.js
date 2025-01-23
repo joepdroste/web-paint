@@ -114,7 +114,6 @@ app.post("/api/login", async (req, res) => {
     }
 
     db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
-        console.log(user.id)
         if (!user) {
             return res.status(400).json({ error: "Invalid username or password." });
         }
@@ -139,7 +138,6 @@ function authenticate(req, res, next) {
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
         req.user = decoded;
-        console.log("Authenticated user:", decoded);
         next();
     } catch (err) {
         res.status(401).json({ error: "Invalid or expired token." });
@@ -151,13 +149,11 @@ app.post("/api/drawings", authenticate, (req, res) => {
     const {username, userID} = req.user;
     const imageData = req.body;
     
-    console.log(req.user);
     if (!userID || !imageData) {
         return res.status(400).json({ error: "User ID and image data are required." });
     }
 
     db.run('INSERT INTO images (userID, imageData) VALUES (?, ?)', [userID, imageData.drawing], function(err) {
-        console.log(imageData)
         if (err) {
             return res.status(500).json({ error: "Failed to upload image." });
         }
@@ -180,7 +176,7 @@ app.delete("/api/drawings/:id", authenticate, (req, res) => {
             return res.status(404).json({ error: "Drawing not found" });
         }
 
-        // Check if the authenticated user is the owner of the drawing
+
         if (userID === drawing.userId) {
             db.run('DELETE FROM images WHERE id = ?', [id], (err) => {
                 if (err) {
@@ -196,10 +192,9 @@ app.delete("/api/drawings/:id", authenticate, (req, res) => {
 
 // Delete all drawings for a specific user
 app.delete("/api/user/:id", authenticate, (req, res) => {
-    const { userID } = req.user;  // Get the userID from the authenticated user
-    const { id } = req.params;    // Get the userID from the URL parameter
+    const { userID } = req.user;  
+    const { id } = req.params;    
 
-    // Check if the authenticated user has permission to delete drawings for the given userID
     if (userID !== parseInt(id)) {
         return res.status(403).json({ error: "You are not authorized to delete drawings for this user." });
     }

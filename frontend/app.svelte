@@ -17,8 +17,8 @@
     let password = "";
     let deleteID = null;
     let loadID = null;
-    let showModal = false; // Controls modal visibility
-    let savedDrawings = []; // Store fetched drawings
+    let showModal = false;
+    let savedDrawings = [];
 
     const socket = io();
 
@@ -102,26 +102,22 @@
     function getMousePosition(event) {
         const rect = canvas.getBoundingClientRect();
 
-        // Scale factors for width and height
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
 
         if (event.touches && event.touches.length > 0) {
-            // For touchstart and touchmove
             const touch = event.touches[0];
             return {
                 x: (touch.clientX - rect.left) * scaleX,
                 y: (touch.clientY - rect.top) * scaleY,
             };
         } else if (event.changedTouches && event.changedTouches.length > 0) {
-            // For touchend
             const touch = event.changedTouches[0];
             return {
                 x: (touch.clientX - rect.left) * scaleX,
                 y: (touch.clientY - rect.top) * scaleY,
             };
         } else {
-            // For mouse events
             return {
                 x: (event.clientX - rect.left) * scaleX,
                 y: (event.clientY - rect.top) * scaleY,
@@ -155,10 +151,8 @@
         if (!mousedownLocation) return;
 
         if (currentShape === "Brush" && activeBrush) {
-            // Finalize the brush stroke
             brushStrokes.push(activeBrush);
 
-            // Send the brush stroke to other users
             if (currentRoom !== null) {
                 socket.emit("draw", {
                     shape: currentShape ,

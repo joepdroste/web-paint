@@ -39,10 +39,8 @@ export async function login(username, password) {
 
 // Share the drawing
 export async function saveDrawing(canvas) {
-    console.log("test")
     const token = localStorage.getItem('authToken');
     const drawing = canvas.toDataURL("image/png");
-    console.log("Drawing:", drawing);
 
     const response = await fetch('/api/drawings', {
         method: 'POST',
