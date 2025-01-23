@@ -39,9 +39,10 @@ export async function login(username, password) {
 
 // Share the drawing
 export async function saveDrawing(canvas) {
+    console.log("test")
     const token = localStorage.getItem('authToken');
     const drawing = canvas.toDataURL("image/png");
-    console.log(drawing);
+    console.log("Drawing:", drawing);
 
     const response = await fetch('/api/drawings', {
         method: 'POST',
@@ -96,3 +97,42 @@ export async function deleteAllImages(id) {
 
     console.log('All drawings deleted successfully');
 }
+
+export async function loadDrawing(id, context) {
+    try {
+        const response = await fetch(`/api/drawings/${id}`);
+        if (!response.ok) {
+            throw new Error("Failed to load drawing.");
+        }
+
+        const { imageData } = await response.json();
+
+        const img = new Image();
+        img.onload = () => {
+            context.clearRect(0, 0, 1920, 1080); // Clear the canvas
+            context.drawImage(img, 0, 0, 1920, 1080); // Draw the loaded image
+        };
+        img.src = imageData;
+    } catch (error) {
+        console.error(error);
+        alert("Failed to load drawing.");
+    }
+}
+
+export async function fetchSavedDrawings() {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch('/api/drawings/', {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+        },
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+    }
+
+    return await response.json(); // Return array of drawings
+}
+

@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 import { Server } from "socket.io";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { db } from "./database.js";
 
 dotenv.config();
 
@@ -17,12 +18,8 @@ const httpServer = HTTP.createServer();
 httpServer.on('request', app);
 const io = new Server(httpServer);
 
+
 const SECRET_KEY = process.env.SECRET_KEY || "supersecretkey";
-
-// In-memory storage for users and drawings
-let users = []; // [{ username, passwordHash }]
-let drawings = [];
-
 
 // Websocket
 io.on("connection", (socket) => {
@@ -52,25 +49,37 @@ io.on("connection", (socket) => {
 
 // Get all drawings
 app.get("/api/drawings", (req, res) => {
-    res.json(drawings);
+    db.all('SELECT * FROM images', (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: "Failed to retrieve drawings." });
+        }
+        res.json(rows);
+    });
 });
 
 // Get a specific drawing by ID
 app.get("/api/drawings/:id", (req, res) => {
     const { id } = req.params;
-    const drawing = drawings.find(d => d.id === parseInt(id));
-    if (!drawing) {
-        return res.status(404).json({ error: "Drawing not found" });
-    }
-    res.json(drawing);
+    db.get('SELECT * FROM images WHERE id = ?', [id], (err, row) => {
+        if (err) {
+            return res.status(500).json({ error: "Failed to retrieve drawing." });
+        }
+        if (!row) {
+            return res.status(404).json({ error: "Drawing not found." });
+        }
+        res.json(row);
+    });
 });
 
 // Get all drawings by a specific user
-app.get("/api/user/:userID", (req, res) => {
+app.get("/api/user/:userID/drawings", (req, res) => {
     const { userID } = req.params;
-    const userDrawings = drawings.filter(d => d.userID === parseInt(userID));
-
-    res.json(userDrawings);
+    db.all('SELECT * FROM images WHERE userId = ?', [userID], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: "Failed to retrieve user's drawings." });
+        }
+        res.json(rows);
+    });
 });
 
 // Register a new user
@@ -81,16 +90,19 @@ app.post("/api/register", async (req, res) => {
         return res.status(400).json({ error: "Username and password are required." });
     }
 
-    const existingUser = users.find(user => user.username === username);
-    if (existingUser) {
-        return res.status(400).json({ error: "Username already exists." });
-    }
+    db.get('SELECT username FROM users WHERE username = ?', [username], async (err, row) => {
+        if (row) {
+            return res.status(400).json({ error: "Username already exists." });
+        }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const userID = users.length + 1;
-    users.push({ username, passwordHash, userID });
-
-    res.status(201).json({ message: "User registered successfully." });
+        const passwordHash = await bcrypt.hash(password, 10);
+        db.run('INSERT INTO users (username, passwordHash) VALUES (?, ?)', [username, passwordHash], function(err) {
+            if (err) {
+                return res.status(500).json({ error: "Failed to register user." });
+            }
+            res.status(201).json({ message: "User registered successfully." });
+        });
+    });
 });
 
 // Login a user
@@ -101,18 +113,20 @@ app.post("/api/login", async (req, res) => {
         return res.status(400).json({ error: "Username and password are required." });
     }
 
-    const user = users.find(user => user.username === username);
-    if (!user) {
-        return res.status(400).json({ error: "Invalid username or password." });
-    }
+    db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
+        console.log(user.id)
+        if (!user) {
+            return res.status(400).json({ error: "Invalid username or password." });
+        }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordValid) {
-        return res.status(400).json({ error: "Invalid username or password." });
-    }
+        const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        if (!isPasswordValid) {
+            return res.status(400).json({ error: "Invalid username or password." });
+        }
 
-    const token = jwt.sign({ username: username, userID: user.userID }, SECRET_KEY, { expiresIn: "1h" });
-    res.status(200).json({ token, message: "Login successful." });
+        const token = jwt.sign({ username: username, userID: user.id }, SECRET_KEY, { expiresIn: "1h" });
+        res.status(200).json({ token, message: "User logged in successfully." });
+    });
 });
 
 function authenticate(req, res, next) {
@@ -135,12 +149,21 @@ function authenticate(req, res, next) {
 // Post a new drawing
 app.post("/api/drawings", authenticate, (req, res) => {
     const {username, userID} = req.user;
-    const drawing = req.body;
-    // Add an id to each drawing for uniqueness
-    drawing.id = drawings.length + 1;
-    drawing.userID = userID;
-    drawings.push(drawing);
-    res.status(201).json(drawing);
+    const imageData = req.body;
+    
+    console.log(req.user);
+    if (!userID || !imageData) {
+        return res.status(400).json({ error: "User ID and image data are required." });
+    }
+
+    db.run('INSERT INTO images (userID, imageData) VALUES (?, ?)', [userID, imageData.drawing], function(err) {
+        console.log(imageData)
+        if (err) {
+            return res.status(500).json({ error: "Failed to upload image." });
+        }
+        res.status(201).json({ message: "Image uploaded successfully." });
+    });
+
 });
 
 // Delete a drawing by ID
@@ -148,22 +171,27 @@ app.delete("/api/drawings/:id", authenticate, (req, res) => {
     const { userID } = req.user;
     const { id } = req.params;
 
-    // Find the drawing by ID
-    const drawing = drawings.find(d => d.id === parseInt(id)); // Use parseInt to compare as integers
+    db.get('SELECT * FROM images WHERE id = ?', [id], (err, drawing) => {
+        if (err) {
+            return res.status(500).json({ error: "Failed to find drawing." });
+        }
 
-    if (!drawing) {
-        return res.status(404).json({ error: "Drawing not found" });
-    }
+        if (!drawing) {
+            return res.status(404).json({ error: "Drawing not found" });
+        }
 
-    // Check if the authenticated user is the owner of the drawing
-    if (userID === drawing.userID) {
-        // Remove the drawing from the array
-        const index = drawings.indexOf(drawing);
-        drawings.splice(index, 1); // Remove the drawing
-        res.status(200).json({ message: "Drawing deleted successfully" });
-    } else {
-        res.status(403).json({ error: "You are not authorized to delete this drawing" });
-    }
+        // Check if the authenticated user is the owner of the drawing
+        if (userID === drawing.userId) {
+            db.run('DELETE FROM images WHERE id = ?', [id], (err) => {
+                if (err) {
+                    return res.status(500).json({ error: "Failed to delete drawing." });
+                }
+                res.status(200).json({ message: "Drawing deleted successfully" });
+            });
+        } else {
+            res.status(403).json({ error: "You are not authorized to delete this drawing" });
+        }
+    });
 });
 
 // Delete all drawings for a specific user
@@ -176,10 +204,12 @@ app.delete("/api/user/:id", authenticate, (req, res) => {
         return res.status(403).json({ error: "You are not authorized to delete drawings for this user." });
     }
 
-    // Filter out drawings by the given userID
-    drawings = drawings.filter(drawing => drawing.userID !== parseInt(id));
-
-    res.status(200).json({ message: "All drawings deleted successfully." });
+    db.run('DELETE FROM images WHERE userId = ?', [id], (err) => {
+        if (err) {
+            return res.status(500).json({ error: "Failed to delete drawings." });
+        }
+        res.status(200).json({ message: "All drawings deleted successfully" });
+    });
 });
 
 // Serve frontend files

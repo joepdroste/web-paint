@@ -1,12 +1,12 @@
 <script>
     import { onMount } from "svelte";
     import { Circle, Rectangle, Line, Brush } from "./shapes";
-    import { register, login, saveDrawing, deleteImage, deleteAllImages } from './api.js';
+    import { register, login, saveDrawing, deleteImage, deleteAllImages, loadDrawing, fetchSavedDrawings } from './api.js';
 
     let canvas;
     let context;
     let mousedownLocation = null;
-    let currentShape = "Circle";
+    let currentShape = "Brush";
     let currentColor = "#000000";
     let currentFillColor = null;
     let activeBrush = null;
@@ -16,6 +16,9 @@
     let username = "";
     let password = "";
     let deleteID = null;
+    let loadID = null;
+    let showModal = false; // Controls modal visibility
+    let savedDrawings = []; // Store fetched drawings
 
     const socket = io();
 
@@ -23,12 +26,44 @@
         drawFromSocket(data);
     });
 
+    socket.on("loadImage", (data) => {
+        fetch
+    });
+
     const shapeMap = {
+        Brush,
         Circle,
         Rectangle,
-        Line,
-        Brush
+        Line
     };
+
+    async function openModal() {
+        showModal = true;
+        try {
+            savedDrawings = await fetchSavedDrawings();
+            if (savedDrawings.length === 0) {
+                console.log("No saved drawings found.");
+            }
+        } catch (error) {
+            console.error("Failed to fetch saved drawings:", error);
+        }
+    }
+
+    function closeModal() {
+        showModal = false;
+    }
+
+    function selectDrawing(base64Image) {
+        const img = new Image();
+        img.onload = () => {
+            context.clearRect(0, 0, 1920, 1080);
+            context.drawImage(img, 0, 0, 1920, 1080);
+        };
+        img.src = base64Image;
+        closeModal();
+    }
+
+
 
     function clearCanvas() {
         context.clearRect(0, 0, 1920, 1080);
@@ -50,6 +85,18 @@
     function joinRoom() {
         socket.emit("joinRoom", currentRoom);
         console.log(`Joined room: ${currentRoom}`);
+    }
+
+    function handleRegister() {
+        const result = register(username, password);
+        username = "";
+        password = "";
+    }
+
+    function handleLogin() {
+        const result = login(username, password);
+        username = "";
+        password = "";
     }
 
     function getMousePosition(event) {
@@ -183,39 +230,67 @@
 
     <!-- Toolbar -->
     <div class="toolbar">
-        <input type="text" placeholder="Username" bind:value="{username}">
-        <input type="password" placeholder="Password" bind:value="{password}">
-        <button on:click="{() => register(username, password)}">Register</button>
-        <button on:click="{() => login(username, password)}">Login</button>
-        <button on:click="{() => saveDrawing(canvas)}">Save</button>
-        <button on:click="{emitClear}">Clear</button>
-        <button on:click={deleteImage(deleteID)}>Delete</button>
-        <button on:click={deleteAllImages(deleteID)}>Delete All</button>
-        <input type="number" placeholder="Drawing ID" bind:value={deleteID}>
+        <div class="saveclear">
+            <button on:click="{() => saveDrawing(canvas)}">Save</button>
+            <button on:click="{emitClear}">Clear</button>
+        </div>
+        <div class="login">
+            <h4>Login</h4>
+            <input type="text" placeholder="Username" bind:value="{username}" id="username">
+            <input type="password" placeholder="Password" bind:value="{password}" id="password">
+            <button on:click="{() => handleRegister()}">Register</button>
+            <button on:click="{() => handleLogin()}">Login</button>
+        </div>
+        <div class="delete">
+            <h4>Delete</h4>
+            <input type="number" placeholder="Drawing ID" bind:value={deleteID}>
+            <button on:click={deleteImage(deleteID)}>Delete</button>
+            <button on:click={deleteAllImages(deleteID)}>Delete All</button>
+        </div>
         <!-- <button on:click={loadDrawing}>Load</button> -->
-        <select bind:value="{currentShape}">
-            {#each Object.keys(shapeMap) as shape}
-                <option value="{shape}">{shape}</option>
-            {/each}
-        </select>
-        <select bind:value={currentColor}>
-            <option value="#000000">Black</option>
-            <option value="#ff0000">Red</option>
-            <option value="#00ff00">Green</option>
-            <option value="#0000ff">Blue</option>
-        </select>
-        <select bind:value={currentFillColor}>
-            <option value="#000000">Black</option>
-            <option value="#ff0000">Red</option>
-            <option value="#00ff00">Green</option>
-            <option value="#0000ff">Blue</option>
-        </select>
-        <input type="range" min="1" max="10" on:change={setLineWidth} bind:value="{currentLineWidth}">
-        <select bind:value={currentRoom}>
-            <option value="Room1">Room 1</option>
-            <option value="Room2">Room 2</option>
-            <option value="Room3">Room 3</option>
-        </select>
-        <button on:click="{joinRoom}">Join Room</button>
+        <div class="brush">
+            <h4>Shapes/Brush</h4>
+            <select bind:value="{currentShape}">
+                {#each Object.keys(shapeMap) as shape}
+                    <option value="{shape}">{shape}</option>
+                {/each}
+            </select>
+        </div>
+        <div class="color">
+            <h4>Color</h4>
+            <input type="color" bind:value={currentColor} id="color">
+        </div>
+        <div class="fillcolor">
+            <h4>Fill Color</h4>
+            <input type="color" bind:value={currentFillColor} id="fillcolor">
+        </div>
+        <div class="room">
+            <h4>Room</h4>
+            <input type="text" bind:value={currentRoom} id="roominput">
+            <button on:click="{joinRoom}">Join Room</button>
+        </div>
+        <div class="brushsize">
+            <h4>Brush Size</h4>
+            <input type="range" min="1" max="10" on:change={setLineWidth} bind:value="{currentLineWidth}">
+        </div>
+        <div class="load">
+            <button on:click={openModal}>Load Drawing</button>
+        </div>
     </div>
 </div>
+
+{#if showModal}
+<div class="modal">
+    <div class="modal-content">
+        <span class="close" on:click={closeModal}>&times;</span>
+        <h3>Select a Drawing</h3>
+        <div>
+            {#each savedDrawings as drawing}
+            <div class="drawing" on:click={() => selectDrawing(drawing.imageData)}>
+                <img src={drawing.imageData} alt="Saved Drawing" />
+            </div>
+            {/each}
+        </div>
+    </div>
+</div>
+{/if}
