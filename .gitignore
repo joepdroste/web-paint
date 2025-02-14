@@ -4,3 +4,5 @@ build
 target
 postgresqlite
 __pycache__
+expose-http
+database.db

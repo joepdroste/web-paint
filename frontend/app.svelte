@@ -1,51 +1,46 @@
 <script>
     import { onMount } from "svelte";
     import { Circle, Rectangle, Line, Brush } from "./shapes";
-    import { register, login, saveDrawing, deleteImage, deleteAllImages, loadDrawing, fetchSavedDrawings } from './api.js';
+    import {
+        register,
+        login,
+        saveDrawing,
+        deleteImage,
+        deleteAllImages,
+        loadDrawing,
+        fetchSavedDrawings,
+    } from "./api.js";
 
     let canvas;
     let context;
     let mousedownLocation = null;
     let currentShape = "Brush";
     let currentColor = "#000000";
-    let currentFillColor = null;
-    let activeBrush = null;
-    let currentLineWidth = 1
+    let currentLineWidth = 3;
     let brushStrokes = [];
-    let currentRoom = null;
+    let currentRoom = "";
     let username = "";
     let password = "";
     let deleteID = null;
-    let loadID = null;
     let showModal = false;
     let savedDrawings = [];
+    let useFill = false; // Toggle for fill mode
 
     const socket = io();
 
     socket.on("draw", (data) => {
         drawFromSocket(data);
     });
+    socket.on("clear", clearCanvas);
 
-    socket.on("loadImage", (data) => {
-        fetch
-    });
-
-    const shapeMap = {
-        Brush,
-        Circle,
-        Rectangle,
-        Line
-    };
+    const shapeMap = { Brush, Circle, Rectangle, Line };
 
     async function openModal() {
         showModal = true;
         try {
             savedDrawings = await fetchSavedDrawings();
-            if (savedDrawings.length === 0) {
-                console.log("No saved drawings found.");
-            }
         } catch (error) {
-            console.error("Failed to fetch saved drawings:", error);
+            console.error("Error fetching saved drawings:", error);
         }
     }
 
@@ -56,17 +51,15 @@
     function selectDrawing(base64Image) {
         const img = new Image();
         img.onload = () => {
-            context.clearRect(0, 0, 1920, 1080);
-            context.drawImage(img, 0, 0, 1920, 1080);
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(img, 0, 0, canvas.width, canvas.height);
         };
         img.src = base64Image;
         closeModal();
     }
 
-
-
     function clearCanvas() {
-        context.clearRect(0, 0, 1920, 1080);
+        context.clearRect(0, 0, canvas.width, canvas.height);
         brushStrokes = [];
     }
 
@@ -74,74 +67,54 @@
         context.lineWidth = currentLineWidth;
     }
 
-    function emitClear() {
-        if (currentRoom !== null) {
-            socket.emit("clear", currentRoom);
-        } else {
-            clearCanvas();
-        }
-    }
-    
     function joinRoom() {
         socket.emit("joinRoom", currentRoom);
-        console.log(`Joined room: ${currentRoom}`);
     }
 
     function handleRegister() {
-        const result = register(username, password);
+        register(username, password);
         username = "";
         password = "";
     }
 
     function handleLogin() {
-        const result = login(username, password);
+        login(username, password);
         username = "";
         password = "";
     }
 
     function getMousePosition(event) {
         const rect = canvas.getBoundingClientRect();
-
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-
         if (event.touches && event.touches.length > 0) {
             const touch = event.touches[0];
             return {
                 x: (touch.clientX - rect.left) * scaleX,
                 y: (touch.clientY - rect.top) * scaleY,
             };
-        } else if (event.changedTouches && event.changedTouches.length > 0) {
-            const touch = event.changedTouches[0];
-            return {
-                x: (touch.clientX - rect.left) * scaleX,
-                y: (touch.clientY - rect.top) * scaleY,
-            };
-        } else {
-            return {
-                x: (event.clientX - rect.left) * scaleX,
-                y: (event.clientY - rect.top) * scaleY,
-            };
         }
+        return {
+            x: (event.clientX - rect.left) * scaleX,
+            y: (event.clientY - rect.top) * scaleY,
+        };
     }
 
-
+    let activeBrush = null;
     function handleMouseDown(event) {
         event.preventDefault();
         mousedownLocation = getMousePosition(event);
-
         if (currentShape === "Brush") {
             activeBrush = new Brush(currentColor, currentLineWidth);
             activeBrush.addPoint(mousedownLocation);
-            return;
         }
     }
 
     function handleMouseMove(event) {
         event.preventDefault();
         if (currentShape === "Brush" && activeBrush) {
-            const mousePosition = getMousePosition(event);
-            activeBrush.addPoint(mousePosition);
+            const pos = getMousePosition(event);
+            activeBrush.addPoint(pos);
             activeBrush.draw(context);
         }
     }
@@ -149,42 +122,37 @@
     function handleMouseUp(event) {
         event.preventDefault();
         if (!mousedownLocation) return;
-
         if (currentShape === "Brush" && activeBrush) {
             brushStrokes.push(activeBrush);
-
-            if (currentRoom !== null) {
-                socket.emit("draw", {
-                    shape: currentShape ,
-                    points: activeBrush.points,
-                    color: activeBrush.color,
-                    lineWidth: activeBrush.lineWidth,
-                    room: currentRoom,
-                });
-            };
-
+            socket.emit("draw", {
+                shape: currentShape,
+                points: activeBrush.points,
+                color: currentColor,
+                lineWidth: activeBrush.lineWidth,
+                room: currentRoom,
+            });
             activeBrush = null;
         } else {
             const endLocation = getMousePosition(event);
-    
             const shapeClass = shapeMap[currentShape];
-            const shape = new shapeClass(mousedownLocation, endLocation, currentColor, currentFillColor);
-    
+            // If fill mode is enabled, use the selected color for filling; otherwise, no fill.
+            const fill = useFill ? currentColor : null;
+            const shape = new shapeClass(
+                mousedownLocation,
+                endLocation,
+                currentColor,
+                fill,
+            );
             shape.draw(context);
-            
-            if (currentRoom !== null) {
-                socket.emit("draw", {
-                    shape: currentShape,
-                    start: mousedownLocation,
-                    end: endLocation,
-                    color: currentColor,
-                    fillColor: currentFillColor,
-                    room: currentRoom,
-                });
-            }
-            brushStrokes = [];
+            socket.emit("draw", {
+                shape: currentShape,
+                start: mousedownLocation,
+                end: endLocation,
+                color: currentColor,
+                fillColor: fill,
+                room: currentRoom,
+            });
         }
-
         mousedownLocation = null;
     }
 
@@ -193,98 +161,203 @@
             const brush = new Brush(data.color, data.lineWidth);
             brush.points = data.points;
             brush.draw(context);
-            brushStrokes.push(brush);
         } else {
             const shapeClass = shapeMap[data.shape];
-            const shape = new shapeClass(data.start, data.end, data.color, data.fillColor);
+            const shape = new shapeClass(
+                data.start,
+                data.end,
+                data.color,
+                data.fillColor,
+            );
             shape.draw(context);
         }
     }
 
+    function setCurrentShape(shape) {
+        currentShape = shape;
+    }
+
     onMount(() => {
         context = canvas.getContext("2d");
-        socket.on("clear", clearCanvas);
+        canvas.width = 1920;
+        canvas.height = 1080;
+        context.lineWidth = currentLineWidth;
     });
 </script>
 
-<div class="main">
-    <div class="container">
-        <canvas
-            bind:this={canvas}
-            width={1920}
-            height={1080}
-            on:mousedown="{handleMouseDown}"
-            on:mouseup="{handleMouseUp}"
-            on:mousemove="{handleMouseMove}"
-            on:touchstart="{handleMouseDown}"
-            on:touchend="{handleMouseUp}"
-            on:touchmove="{handleMouseMove}"
-        ></canvas>
-    </div>
+<div class="app">
+    <!-- Header: Branding & Authentication -->
+    <header class="header">
+        <h1>Web Paint</h1>
+        <div class="auth">
+            <input type="text" placeholder="Username" bind:value={username} />
+            <input
+                type="password"
+                placeholder="Password"
+                bind:value={password}
+            />
+            <button on:click={handleRegister}>Register</button>
+            <button on:click={handleLogin}>Login</button>
+        </div>
+    </header>
 
-    <!-- Toolbar -->
-    <div class="toolbar">
-        <div class="saveclear">
-            <button on:click="{() => saveDrawing(canvas)}">Save</button>
-            <button on:click="{emitClear}">Clear</button>
+    <!-- Main content: Canvas and Sidebar Toolbar -->
+    <main class="main-content">
+        <div class="canvas-container">
+            <canvas
+                bind:this={canvas}
+                on:mousedown={handleMouseDown}
+                on:mousemove={handleMouseMove}
+                on:mouseup={handleMouseUp}
+                on:touchstart={handleMouseDown}
+                on:touchmove={handleMouseMove}
+                on:touchend={handleMouseUp}
+            >
+            </canvas>
         </div>
-        <div class="login">
-            <h4>Login</h4>
-            <input type="text" placeholder="Username" bind:value="{username}" id="username">
-            <input type="password" placeholder="Password" bind:value="{password}" id="password">
-            <button on:click="{() => handleRegister()}">Register</button>
-            <button on:click="{() => handleLogin()}">Login</button>
-        </div>
-        <div class="delete">
-            <h4>Delete</h4>
-            <input type="number" placeholder="Drawing ID" bind:value={deleteID}>
-            <button on:click={deleteImage(deleteID)}>Delete</button>
-            <button on:click={deleteAllImages(deleteID)}>Delete All</button>
-        </div>
-        <!-- <button on:click={loadDrawing}>Load</button> -->
-        <div class="brush">
-            <h4>Shapes/Brush</h4>
-            <select bind:value="{currentShape}">
-                {#each Object.keys(shapeMap) as shape}
-                    <option value="{shape}">{shape}</option>
-                {/each}
-            </select>
-        </div>
-        <div class="color">
-            <h4>Color</h4>
-            <input type="color" bind:value={currentColor} id="color">
-        </div>
-        <div class="fillcolor">
-            <h4>Fill Color</h4>
-            <input type="color" bind:value={currentFillColor} id="fillcolor">
-        </div>
-        <div class="room">
-            <h4>Room</h4>
-            <input type="text" bind:value={currentRoom} id="roominput">
-            <button on:click="{joinRoom}">Join Room</button>
-        </div>
-        <div class="brushsize">
-            <h4>Brush Size</h4>
-            <input type="range" min="1" max="10" on:change={setLineWidth} bind:value="{currentLineWidth}">
-        </div>
-        <div class="load">
-            <button on:click={openModal}>Load Drawing</button>
-        </div>
-    </div>
-</div>
-
-{#if showModal}
-<div class="modal">
-    <div class="modal-content">
-        <span class="close" on:click={closeModal}>&times;</span>
-        <h3>Select a Drawing</h3>
-        <div>
-            {#each savedDrawings as drawing}
-            <div class="drawing" on:click={() => selectDrawing(drawing.imageData)}>
-                <img src={drawing.imageData} alt="Saved Drawing" />
+        <aside class="toolbar">
+            <!-- Tools Group: Shape Buttons with Icons -->
+            <div class="tool-group shapes">
+                <h3>Shapes</h3>
+                <div class="shape-buttons">
+                    <button
+                        class="shape-button"
+                        class:active={currentShape === "Brush"}
+                        on:click={() => setCurrentShape("Brush")}
+                    >
+                        <!-- Brush Icon -->
+                        <svg width="24" height="24" viewBox="0 0 24 24">
+                            <path
+                                d="M4,20 C6,18 8,16 10,14"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                fill="none"
+                            />
+                            <circle cx="10" cy="14" r="2" fill="currentColor" />
+                        </svg>
+                    </button>
+                    <button
+                        class="shape-button"
+                        class:active={currentShape === "Circle"}
+                        on:click={() => setCurrentShape("Circle")}
+                    >
+                        <!-- Circle Icon -->
+                        <svg width="24" height="24" viewBox="0 0 24 24">
+                            <circle
+                                cx="12"
+                                cy="12"
+                                r="8"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                fill="none"
+                            />
+                        </svg>
+                    </button>
+                    <button
+                        class="shape-button"
+                        class:active={currentShape === "Rectangle"}
+                        on:click={() => setCurrentShape("Rectangle")}
+                    >
+                        <!-- Rectangle Icon -->
+                        <svg width="24" height="24" viewBox="0 0 24 24">
+                            <rect
+                                x="5"
+                                y="5"
+                                width="14"
+                                height="14"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                fill="none"
+                            />
+                        </svg>
+                    </button>
+                    <button
+                        class="shape-button"
+                        class:active={currentShape === "Line"}
+                        on:click={() => setCurrentShape("Line")}
+                    >
+                        <!-- Line Icon -->
+                        <svg width="24" height="24" viewBox="0 0 24 24">
+                            <line
+                                x1="4"
+                                y1="20"
+                                x2="20"
+                                y2="4"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            />
+                        </svg>
+                    </button>
+                </div>
             </div>
-            {/each}
+
+            <!-- Color Picker and Fill Toggle -->
+            <div class="tool-group colors">
+                <h3>Color</h3>
+                <input type="color" bind:value={currentColor} id="color" />
+                <button
+                    class="fill-toggle"
+                    on:click={() => (useFill = !useFill)}
+                >
+                    {useFill ? "Fill: On" : "Fill: Off"}
+                </button>
+            </div>
+
+            <!-- Brush Size -->
+            <div class="tool-group">
+                <h3>Brush Size</h3>
+                <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    bind:value={currentLineWidth}
+                    on:change={setLineWidth}
+                />
+            </div>
+
+            <!-- Room -->
+            <div class="tool-group">
+                <h3>Room</h3>
+                <input
+                    type="text"
+                    placeholder="Room Name"
+                    bind:value={currentRoom}
+                />
+                <button on:click={joinRoom}>Join Room</button>
+            </div>
+
+            <!-- Actions -->
+            <div class="tool-group">
+                <h3>Actions</h3>
+                <button on:click={() => saveDrawing(canvas)}>Save</button>
+                <button on:click={clearCanvas}>Clear</button>
+            </div>
+
+            <!-- Load Drawings -->
+            <div class="tool-group">
+                <h3>Load Drawing</h3>
+                <button on:click={openModal}>Load</button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Modal for Saved Drawings -->
+    {#if showModal}
+        <div class="modal">
+            <div class="modal-content">
+                <span class="close" on:click={closeModal}>&times;</span>
+                <h2>Select a Drawing</h2>
+                <div class="drawings-list">
+                    {#each savedDrawings as drawing}
+                        <div
+                            class="drawing-item"
+                            on:click={() => selectDrawing(drawing.imageData)}
+                        >
+                            <img src={drawing.imageData} alt="Saved Drawing" />
+                        </div>
+                    {/each}
+                </div>
+            </div>
         </div>
-    </div>
+    {/if}
 </div>
-{/if}

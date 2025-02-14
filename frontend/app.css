@@ -1,183 +1,215 @@
-/* Center the canvas */
+/* Global Styles */
+* {
+    box-sizing: border-box;
+}
+
+html,
 body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
     margin: 0;
-    background-color: #f0f0f0; /* Light gray background */
+    padding: 0;
+    font-family: 'Helvetica Neue', sans-serif;
+    background-color: #f9f9f9;
 }
 
-.main {
+.app {
     display: flex;
-    justify-content: center;
-    align-items: center;
     flex-direction: column;
+    height: 100vh;
 }
 
-.container {
-    aspect-ratio: 16 / 9;
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #3f51b5;
+    color: #fff;
+    padding: 1rem 2rem;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+.auth input {
+    margin: 0 0.5rem;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 4px;
+}
+
+.auth button {
+    margin: 0 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #303f9f;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.auth button:hover {
+    background: #283593;
+}
+
+/* Main Content Layout */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.canvas-container {
+    flex: 3;
+    background: #fff;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: auto;
-    width: 60vw;
-    margin: 0;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+canvas {
+    max-width: 100%;
+    max-height: 100%;
 }
 
 .toolbar {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(5, 1fr);
-    grid-column-gap: 0px;
-    grid-row-gap: 0px;     
+    flex: 1;
+    background: #e8eaf6;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
 }
 
-@media (max-width: 1000px) {
-    .toolbar {
-        grid-template-columns: 1fr;
-        grid-template-rows: repeat(9, 1fr); /* Adjust rows to accommodate all items */
-    }
-
-    .container {
-        width: 80vw; /* Adjust width to fit smaller screens */
-    }
-
-    input[type="text"],
-    input[type="password"] {
-        width: 100px; /* Set desired width */
-
-    }
+.tool-group h3 {
+    margin: 0 0 0.5rem 0;
 }
 
-
-canvas {
+.tool-group input,
+.tool-group button,
+.tool-group select {
     width: 100%;
-    height: 100%;
-    background-color: white; /* White canvas */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+    padding: 0.5rem;
+    margin: 0.3rem 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
 }
 
-.login {
+.tool-group.colors input[type="color"] {
+    /* Increase width */
+    /* Increase height */
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    padding: 0;
+    cursor: pointer;
+    /* Remove default appearance for more consistency across browsers */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+.tool-group.colors input[type="color"]:focus {
+    outline: none;
+    border-color: #3f51b5;
+}
+
+/* Shape buttons with icons */
+.shape-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.shape-button {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.5rem;
+    cursor: pointer;
+    flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
 }
 
-.delete {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
+.shape-button.active,
+.shape-button:hover {
+    background: #c5cae9;
+    border-color: #3f51b5;
 }
 
-.brush {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
+.fill-toggle {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.5rem;
+    cursor: pointer;
+    margin-top: 0.5rem;
 }
 
-.color {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
-}
-
-.fillcolor {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
-}
-
-.room {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
-}
-
-.brushsize {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
-}
-
-.saveclear {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
-}
-
-.load {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: row;
-    height: 50px;
-    margin: 0;
-}
-
+/* Modal Styles */
 .modal {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
 .modal-content {
-    background: white;
-    padding: 20px;
+    background: #fff;
+    padding: 1.5rem;
     border-radius: 8px;
-    max-width: 600px;
     width: 90%;
+    max-width: 600px;
     max-height: 80%;
     overflow-y: auto;
+    position: relative;
 }
 
-.drawing {
-    display: inline-block;
-    margin: 10px;
-    cursor: pointer;
-}
-
-.drawing img {
-    max-width: 100px;
-    max-height: 100px;
-    object-fit: cover;
-    border: 1px solid #ccc;
-}
-
-.close {
+.modal-content .close {
     position: absolute;
     top: 10px;
-    right: 10px;
+    right: 15px;
+    font-size: 1.5rem;
     cursor: pointer;
-    font-size: 20px;
+}
+
+.drawings-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.drawing-item {
+    width: 100px;
+    height: 100px;
+    overflow: hidden;
+    border: 1px solid #ccc;
+    cursor: pointer;
+}
+
+.drawing-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+    }
+
+    .toolbar {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
 }
