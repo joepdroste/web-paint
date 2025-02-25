@@ -2,7 +2,7 @@ Installation and Setup
 
 1. Clone the Repository
 
-git clone https://github.com/your-repo/drawing-app.git
+git clone https://github.com/joepdroste/web-paint.git
 cd drawing-app
 
 2. Install Dependencies
